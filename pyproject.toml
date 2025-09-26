@@ -1,0 +1,15 @@
+[project]
+name = "pg-data-sync"
+version = "0.1.0"
+description = "Tool for syncing PostGIS databases with datasets from Geonorge"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aiofiles>=24.1.0",
+    "aiohttp>=3.12.15",
+    "asyncio>=4.0.0",
+    "psycopg[binary,pool]>=3.2.9",
+    "pydantic>=2.11.7",
+    "pyyaml>=6.0.2",
+    "xmltodict>=0.15.0",
+]
