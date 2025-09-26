@@ -328,7 +328,7 @@ async def create_indexes(db_name: str, tmp_db_name: str, configs: List[IndexingC
             geom_columns = await _get_all_geom_columns(tmp_db_name, schema_name, config.tables) if config.geom_index else {}
 
             for table_name in config.tables:
-                if not _has_primary_key(indexes, schema_name, table_name):
+                if config.id_column and not _has_primary_key(indexes, schema_name, table_name):
                     await create_primary_key(tmp_db_name, schema_name, table_name, config.id_column)
                     created += 1
 
