@@ -6,6 +6,6 @@ class IndexingConfig(BaseModel):
     dbs: List[str]
     schemas: List[str] = ['public']
     tables: List[str]
-    id_column: Optional[str]
+    id_column: Optional[str] = None
     geom_index: bool = True
     indexes: Optional[List[List[str]]] = []
