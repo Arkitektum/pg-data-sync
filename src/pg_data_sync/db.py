@@ -313,7 +313,10 @@ async def create_indexes(db_name: str, tmp_db_name: str, configs: List[IndexingC
     if not configs:
         return
 
+    print('Creating indexes...')
+
     created = 0
+    start = time.time()
 
     for config in configs:
         if not db_name in config.dbs:
@@ -344,7 +347,7 @@ async def create_indexes(db_name: str, tmp_db_name: str, configs: List[IndexingC
                         await create_index(tmp_db_name, schema_name, table_name, column_names)
                         created += 1
 
-    print(f'Indexes created: {created}')
+    print(f'{created} indexes created in {round(time.time() - start, 2)} sec.')
 
 
 async def view_exists(db_name: str, schema_name: str, view_name: str) -> bool:
