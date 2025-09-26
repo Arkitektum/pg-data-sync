@@ -149,6 +149,7 @@ def filegdb_to_postgis(filepath: str, db_name: str, schema: str) -> None:
         result = subprocess.run(
             command, capture_output=True, text=True, check=True)
 
+        print(result.stderr)
         result.check_returncode()
 
         print(
