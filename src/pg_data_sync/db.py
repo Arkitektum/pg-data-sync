@@ -613,4 +613,4 @@ def _has_index(indexes: List[Dict[str, Any]], schema_name: str, table_name: str,
 __all__ = ['close_active_connections', 'create_db', 'create_extension', 'create_geom_index', 'create_index', 'create_indexes',
            'create_primary_key', 'create_role', 'create_schema', 'db_exists', 'delete_db', 'dict_row', 'filegdb_to_postgis',
            'get_active_connections', 'get_columns', 'get_connection', 'get_db_creation_date', 'get_geom_columns', 'get_schema_names',
-           'load_index_configs', 'rename_db', 'rename_schemas', 'restore_database', 'role_exists', 'set_db_comment', 'view_exists']
+           'rename_db', 'rename_schemas', 'restore_database', 'role_exists', 'set_db_comment', 'view_exists']
