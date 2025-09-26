@@ -22,7 +22,7 @@ async def start() -> int:
 
         if not file_maps:
             print('No need to restore database(s). Aborting...')
-            return 0
+            return -2
 
         download_path = await _download_dataset(config.dataset)
 
@@ -100,8 +100,9 @@ async def _should_restore_db(db_name: str, dataset_updated: date | None) -> bool
 
 async def _clean_up(download_path: str) -> None:
     print('Cleaning up...')
-    
-    utils.delete_file_or_dir(download_path)
+
+    if download_path:
+        utils.delete_file_or_dir(download_path)
 
     for db_name in tmp_dbs_created:
         await db.delete_db(db_name)
