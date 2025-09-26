@@ -2,6 +2,7 @@ import json
 import re
 import zipfile
 import time
+import os
 from collections import OrderedDict
 from pathlib import Path
 from uuid import UUID
@@ -12,10 +13,11 @@ import aiofiles
 import xmltodict
 from aiohttp import BasicAuth
 from .models import DatasetConfig
-from .utils import get_env, delete_file_or_dir
+from .utils import get_env, delete_file_or_dir, get_file_size
 
 DOWNLOAD_API_BASE_URL = 'https://nedlasting.geonorge.no/api'
 METADATA_API_URL = 'https://kartkatalog.geonorge.no/api/getdata'
+DOWNLOAD_TIMEOUT = 1800
 
 
 async def place_order(config: DatasetConfig) -> str:
@@ -32,9 +34,15 @@ async def place_order(config: DatasetConfig) -> str:
     return f'{DOWNLOAD_API_BASE_URL}/v3/download/order/{ref_number}/{file_id}'
 
 
+async def get_remote_file_size(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.head(url) as response:
+            if response.status == 200:
+                content_length = response.headers.get('Content-Length')
+                print(content_length)
+
+
 async def download_file(url: str, filename: str):
-    print('Downloading file...')
-    
     auth = BasicAuth(get_env('API_USERNAME'), get_env('API_PASSWORD'))
     start = time.time()
 
@@ -42,9 +50,16 @@ async def download_file(url: str, filename: str):
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=DOWNLOAD_TIMEOUT)
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(url, auth=auth) as response:
                 response.raise_for_status()
+
+                content_length = response.headers.get('Content-Length')
+                file_size = get_file_size(content_length)
+
+                print(f'Downloading file ({file_size:.2f} MB)...')
 
                 async with aiofiles.open(filename, mode='wb') as file:
                     async for chunk in response.content.iter_chunked(1024 * 1024):

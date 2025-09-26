@@ -63,5 +63,12 @@ def delete_file_or_dir(path: str) -> None:
         raise Exception(f'Error deleting "{path}": {err}')
 
 
-__all__ = ['get_env', 'load_config', 'get_download_path',
-           'get_tmp_db_name', 'get_backup_db_name', 'delete_file_or_dir']
+def get_file_size(content_length: str | None) -> float:
+    if not content_length:
+        return 0
+
+    return int(content_length) / (1024 * 1024)
+
+
+__all__ = ['get_env', 'load_config', 'get_download_path', 'get_tmp_db_name',
+           'get_backup_db_name', 'delete_file_or_dir', 'get_file_size']
