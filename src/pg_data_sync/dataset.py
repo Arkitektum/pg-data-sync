@@ -33,6 +33,8 @@ async def place_order(config: DatasetConfig) -> str:
 
 
 async def download_file(url: str, filename: str):
+    print('Downloading file...')
+    
     auth = BasicAuth(get_env('API_USERNAME'), get_env('API_PASSWORD'))
     start = time.time()
 
@@ -48,8 +50,8 @@ async def download_file(url: str, filename: str):
                     async for chunk in response.content.iter_chunked(1024 * 1024):
                         await file.write(chunk)
 
-                print(
-                    f'File downloaded from "{url}" in {round(time.time() - start, 2)} sec.')
+        print(
+            f'File downloaded from "{url}" in {round(time.time() - start, 2)} sec.')
     except Exception as err:
         raise Exception(f'Error downloading file: {err}')
 

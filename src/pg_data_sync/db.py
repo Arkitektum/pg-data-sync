@@ -80,6 +80,8 @@ async def create_role(role_name: str, db_password: str) -> None:
 
 
 def restore_database(filepath: str, db_name: str) -> None:
+    print('Restoring database...')
+
     path = Path(filepath)
 
     if path.suffix == '.sql':
@@ -116,6 +118,8 @@ def restore_database(filepath: str, db_name: str) -> None:
 
 
 def filegdb_to_postgis(filepath: str, db_name: str, schema: str) -> None:
+    print('Converting FGDB to PostGIS database...')
+
     db_host = os.environ.get('PGHOST')
     db_password = os.environ.get('PGPASSWORD')
 
