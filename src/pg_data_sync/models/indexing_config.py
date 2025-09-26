@@ -2,7 +2,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
-class IndexConfig(BaseModel):
+class IndexingConfig(BaseModel):
     dbs: List[str]
     schemas: List[str] = ['public']
     tables: List[str]

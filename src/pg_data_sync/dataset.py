@@ -11,14 +11,14 @@ import aiohttp
 import aiofiles
 import xmltodict
 from aiohttp import BasicAuth
-from .models.config import Config
+from .models import DatasetConfig
 from .utils import get_env, delete_file_or_dir
 
 DOWNLOAD_API_BASE_URL = 'https://nedlasting.geonorge.no/api'
 METADATA_API_URL = 'https://kartkatalog.geonorge.no/api/getdata'
 
 
-async def place_order(config: Config) -> str:
+async def place_order(config: DatasetConfig) -> str:
     response = await fetch_order(config)
     files: List[Dict] = response.get('files', [])
 
@@ -96,7 +96,7 @@ async def get_dataset_update_date(metadata_id: UUID, area_code: str, area_type: 
     return update_date
 
 
-async def fetch_order(config: Config) -> Dict[str, Any]:
+async def fetch_order(config: DatasetConfig) -> Dict[str, Any]:
     url = f'{DOWNLOAD_API_BASE_URL}/order'
 
     request_body = config.create_order_request_body()

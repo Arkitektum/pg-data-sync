@@ -3,9 +3,9 @@ import yaml
 import shutil
 from datetime import datetime
 from uuid import uuid4
-from typing import Dict, List
+from typing import Dict
 from pathlib import Path
-from .models import Config, IndexConfig
+from .models import Config
 
 
 def get_env(key: str) -> str:
@@ -31,23 +31,6 @@ def load_config() -> Config:
     return Config(**result)
 
 
-def load_index_configs() -> List[IndexConfig]:
-    file_path = Path(get_app_files_dir()).joinpath('indexing.yml')
-    configs: List[IndexConfig] = []
-
-    if not file_path.exists():
-        return configs
-
-    with open(file_path) as file:
-        result = yaml.safe_load_all(file)
-        config: Dict
-        
-        for config in result:
-            configs.append(IndexConfig(**config))
-
-    return configs
-
-
 def get_download_path() -> str:
     download_path = Path(get_app_files_dir()).joinpath(
         'download', str(uuid4()))
@@ -55,18 +38,21 @@ def get_download_path() -> str:
     return str(download_path)
 
 
-def get_db_tmp_name() -> str:
+def get_tmp_db_name() -> str:
     id = str(uuid4()).replace('-', '')
 
     return f'tmp_{id}'
 
 
-def get_db_backup_name(db_name: str) -> str:
+def get_backup_db_name(db_name: str) -> str:
     return f'{db_name}_bak_{datetime.now().strftime('%Y%m%d%H%M%S')}'
 
 
 def delete_file_or_dir(path: str) -> None:
     path_obj = Path(path)
+
+    if not path_obj.exists():
+        return
 
     try:
         if path_obj.is_dir():
@@ -78,4 +64,4 @@ def delete_file_or_dir(path: str) -> None:
 
 
 __all__ = ['get_env', 'load_config', 'get_download_path',
-           'get_db_tmp_name', 'get_db_backup_name', 'delete_file_or_dir']
+           'get_tmp_db_name', 'get_backup_db_name', 'delete_file_or_dir']

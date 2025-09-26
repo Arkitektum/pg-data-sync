@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 from psycopg.sql import SQL, Composed, Identifier, Literal, Placeholder
-from .utils import load_index_configs
+from .models import IndexingConfig
 
 
 async def get_connection(db_name: str) -> AsyncConnection:
@@ -64,9 +64,6 @@ async def create_schema(db_name: str, schema: str) -> None:
 
 
 async def create_role(role_name: str, db_password: str) -> None:
-    if await role_exists(role_name):
-        return
-
     sql = SQL("CREATE ROLE {0} WITH LOGIN PASSWORD {1}").format(
         Identifier(role_name), Literal(db_password))
 
@@ -83,6 +80,8 @@ async def create_role(role_name: str, db_password: str) -> None:
 
 
 def restore_database(filepath: str, db_name: str) -> None:
+    raise Exception(f'Error restoring database')
+
     path = Path(filepath)
 
     if path.suffix == '.sql':
@@ -110,11 +109,8 @@ def restore_database(filepath: str, db_name: str) -> None:
     start = time.time()
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             command, capture_output=True, text=True, check=False)
-
-        # print(result.stderr)
-        # result.check_returncode()
 
         print(f'Database restored in {round(time.time() - start, 2)} sec.')
     except Exception as err:
@@ -237,9 +233,25 @@ async def delete_db(db_name: str) -> None:
             async with conn.cursor() as cur:
                 await cur.execute(sql)
 
-        print('Old database deleted')
+        print(f'Database deleted: {db_name}')
     except Exception as err:
         raise Exception(f'Error deleting old database: {err}')
+
+
+async def delete_role(role_name: str) -> None:
+    sql = SQL('DROP ROLE IF EXISTS {0}').format(
+        Identifier(role_name))
+
+    try:
+        async with await get_connection('postgres') as conn:
+            await conn.set_autocommit(True)
+
+            async with conn.cursor() as cur:
+                await cur.execute(sql)
+
+        print(f'Role deleted: {role_name}')
+    except Exception as err:
+        raise Exception(f'Error deleting role: {err}')
 
 
 async def set_db_comment(db_name: str) -> None:
@@ -295,9 +307,7 @@ async def db_exists(db_name: str) -> bool:
         raise Exception(f'Error checking database existence: {err}')
 
 
-async def create_indexes(db_name: str, tmp_db_name: str) -> None:
-    configs = load_index_configs()
-
+async def create_indexes(db_name: str, tmp_db_name: str, configs: List[IndexingConfig] | None) -> None:
     if not configs:
         return
 
@@ -335,12 +345,13 @@ async def create_indexes(db_name: str, tmp_db_name: str) -> None:
     print(f'Indexes created: {created}')
 
 
-async def view_exists(db_name: str, view_name: str) -> bool:
+async def view_exists(db_name: str, schema_name: str, view_name: str) -> bool:
     sql = SQL("""
         SELECT 1
         FROM pg_views
-        WHERE viewname = {0}
-    """).format(Literal(view_name))
+        WHERE schemaname = {0} 
+            AND viewname = {1}
+    """).format(Literal(schema_name), Literal(view_name))
 
     try:
         async with await get_connection(db_name) as conn:
@@ -597,7 +608,7 @@ def _has_index(indexes: List[Dict[str, Any]], schema_name: str, table_name: str,
                table_name and Counter(index['indexed_columns']) == Counter(column_names) for index in indexes)
 
 
-__all__ = ['close_active_connections', 'create_db', 'create_extension', 'create_geom_index', 'create_index', 'create_indexes', 
+__all__ = ['close_active_connections', 'create_db', 'create_extension', 'create_geom_index', 'create_index', 'create_indexes',
            'create_primary_key', 'create_role', 'create_schema', 'db_exists', 'delete_db', 'dict_row', 'filegdb_to_postgis',
            'get_active_connections', 'get_columns', 'get_connection', 'get_db_creation_date', 'get_geom_columns', 'get_schema_names',
            'load_index_configs', 'rename_db', 'rename_schemas', 'restore_database', 'role_exists', 'set_db_comment', 'view_exists']
