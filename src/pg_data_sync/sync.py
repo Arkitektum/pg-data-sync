@@ -36,7 +36,7 @@ async def start() -> int:
     except Exception:
         err = traceback.format_exc()
         print(err)
-        # await _clean_up(download_path)
+        await _clean_up(download_path)
         return -1
 
 
