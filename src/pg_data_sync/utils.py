@@ -15,12 +15,12 @@ def get_env(key: str) -> str:
     raise Exception(f'Environment variable "{key}" is not set. Aborting...')
 
 
-def get_app_files_dir() -> str:
-    return get_env('APP_FILES_DIR')
+def get_config_dir() -> str:
+    return get_env('CONFIG_DIR')
 
 
 def load_config() -> Config:
-    file_path = Path(get_app_files_dir()).joinpath('config.yml')
+    file_path = Path(get_config_dir()).joinpath('config.yml')
 
     if not file_path.exists():
         raise Exception(f'Configuration file "{file_path}" not found')
@@ -32,10 +32,10 @@ def load_config() -> Config:
 
 
 def get_download_path() -> str:
-    download_path = Path(get_app_files_dir()).joinpath(
-        'download', str(uuid4()))
+    download_dir = os.environ.get('DOWNLOAD_DIR')
+    uuid = str(uuid4())
 
-    return str(download_path)
+    return str(Path(download_dir or get_config_dir()).joinpath(uuid))
 
 
 def get_tmp_db_name() -> str:
