@@ -256,9 +256,41 @@ async def delete_role(role_name: str) -> None:
         raise Exception(f'Error deleting role: {err}')
 
 
-async def set_db_comment(db_name: str) -> None:
-    date_str = datetime.now().strftime('%d.%m.%Y')
-    comment = f'Version: {date_str}'
+async def get_creation_date_from_comment(db_name: str) -> date | None:
+    sql = SQL(""" 
+        SELECT description 
+        FROM pg_shdescription
+        JOIN pg_database ON objoid = pg_database.oid
+        WHERE datname = {0}
+    """).format(Literal(db_name))
+
+    try:
+        async with await get_connection('postgres') as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(sql)
+                result = await cur.fetchone()
+
+                if not result:
+                    return None
+
+                comment: str = result[0]
+                splitted = comment.split(':')[1:]
+                date_str = splitted[0].strip() if splitted else None
+
+                if not date_str:
+                    return None
+
+                try:
+                    return datetime.strptime(date_str, '%Y-%m-%d').date()
+                except:
+                    return None
+    except Exception as err:
+        raise Exception(f'Error getting database comment: {err}')
+
+
+async def set_creation_date_comment(db_name: str) -> None:
+    date_str = datetime.now().strftime('%Y-%m-%d')
+    comment = f'Created: {date_str}'
 
     sql = SQL("COMMENT ON DATABASE {0} IS {1}").format(
         Identifier(db_name), Literal(comment))
@@ -292,8 +324,8 @@ async def get_db_creation_date(db_name: str) -> date | None:
                 mod_date: datetime = result[0]
 
                 return mod_date.date()
-    except Exception as err:
-        raise Exception(f'Error getting database creation date: {err}')
+    except:
+        return None
 
 
 async def db_exists(db_name: str) -> bool:
@@ -325,7 +357,7 @@ async def create_indexes(db_name: str, tmp_db_name: str, configs: List[IndexingC
         indexes = await _get_indexes(tmp_db_name, config.schemas)
 
         for schema_name in config.schemas:
-            geom_columns = await _get_all_geom_columns(tmp_db_name, schema_name, config.tables) if config.geom_index else {}            
+            geom_columns = await _get_all_geom_columns(tmp_db_name, schema_name, config.tables) if config.geom_index else {}
 
             for table_name in config.tables:
                 if not await table_exists(tmp_db_name, schema_name, table_name):
@@ -636,4 +668,5 @@ def _has_index(indexes: List[Dict[str, Any]], schema_name: str, table_name: str,
 __all__ = ['close_active_connections', 'create_db', 'create_extension', 'create_geom_index', 'create_index', 'create_indexes',
            'create_primary_key', 'create_role', 'create_schema', 'db_exists', 'delete_db', 'dict_row', 'filegdb_to_postgis',
            'get_active_connections', 'get_columns', 'get_connection', 'get_db_creation_date', 'get_geom_columns', 'get_schema_names',
-           'rename_db', 'rename_schemas', 'restore_database', 'role_exists', 'set_db_comment', 'view_exists']
+           'rename_db', 'rename_schemas', 'restore_database', 'role_exists', 'get_creation_date_from_comment', 'set_creation_date_comment',
+           'view_exists']

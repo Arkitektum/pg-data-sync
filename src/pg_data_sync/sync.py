@@ -78,7 +78,7 @@ async def _restore_database(download_path: str, file_map: FileMap, format: Forma
 
     await db.create_indexes(file_map.db_name, tmp_db_name, indexing_configs)
 
-    await db.set_db_comment(tmp_db_name)
+    await db.set_creation_date_comment(tmp_db_name)
 
     await db.close_active_connections(file_map.db_name)
 
@@ -93,7 +93,7 @@ async def _should_restore_db(db_name: str, dataset_updated: date | None) -> bool
     if not await db.db_exists(db_name):
         return True
 
-    db_created = await db.get_db_creation_date(db_name)
+    db_created = await db.get_db_creation_date(db_name) or await db.get_creation_date_from_comment(db_name)
 
     return dataset_updated >= db_created if db_created and dataset_updated else True
 
