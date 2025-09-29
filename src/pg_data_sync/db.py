@@ -149,7 +149,6 @@ def filegdb_to_postgis(filepath: str, db_name: str, schema: str) -> None:
         result = subprocess.run(
             command, capture_output=True, text=True, check=True)
 
-        print(result.stderr)
         result.check_returncode()
 
         print(
@@ -326,9 +325,12 @@ async def create_indexes(db_name: str, tmp_db_name: str, configs: List[IndexingC
         indexes = await _get_indexes(tmp_db_name, config.schemas)
 
         for schema_name in config.schemas:
-            geom_columns = await _get_all_geom_columns(tmp_db_name, schema_name, config.tables) if config.geom_index else {}
+            geom_columns = await _get_all_geom_columns(tmp_db_name, schema_name, config.tables) if config.geom_index else {}            
 
             for table_name in config.tables:
+                if not await table_exists(tmp_db_name, schema_name, table_name):
+                    continue
+
                 if config.id_column and not _has_primary_key(indexes, schema_name, table_name):
                     await create_primary_key(tmp_db_name, schema_name, table_name, config.id_column)
                     created += 1
@@ -349,6 +351,23 @@ async def create_indexes(db_name: str, tmp_db_name: str, configs: List[IndexingC
                         created += 1
 
     print(f'{created} indexes created in {round(time.time() - start, 2)} sec.')
+
+
+async def table_exists(db_name: str, schema_name: str, table_name: str) -> bool:
+    sql = SQL("""
+        SELECT 1
+        FROM pg_tables
+        WHERE schemaname = {0} 
+            AND tablename = {1}
+    """).format(Literal(schema_name), Literal(table_name))
+
+    try:
+        async with await get_connection(db_name) as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(sql)
+                return await cur.fetchone() != None
+    except Exception as err:
+        raise Exception(f'Error checking table existence: {err}')
 
 
 async def view_exists(db_name: str, schema_name: str, view_name: str) -> bool:
