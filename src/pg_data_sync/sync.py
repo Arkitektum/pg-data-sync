@@ -119,4 +119,4 @@ async def _clean_up(download_path: str) -> None:
         await db.delete_role(role_name)
 
 
-__all__ = ['start', 'index']
+__all__ = ['start', 'create_indexes']

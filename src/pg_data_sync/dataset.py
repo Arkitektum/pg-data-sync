@@ -1,4 +1,3 @@
-import json
 import re
 import zipfile
 import time
@@ -7,13 +6,12 @@ from pathlib import Path
 from uuid import UUID
 from datetime import datetime, date
 from typing import Dict, List, Any
-import aiohttp
+from httpx import AsyncClient, BasicAuth
 import aiofiles
 import xmltodict
-from aiohttp import BasicAuth
 from .models import DatasetConfig
 from .utils import get_env, delete_file_or_dir, get_file_size
-import httpx
+
 
 DOWNLOAD_API_BASE_URL = 'https://nedlasting.geonorge.no/api'
 METADATA_API_URL = 'https://kartkatalog.geonorge.no/api/getdata'
@@ -34,29 +32,7 @@ async def place_order(config: DatasetConfig) -> str:
     return f'{DOWNLOAD_API_BASE_URL}/v3/download/order/{ref_number}/{file_id}'
 
 
-async def download_file(url: str, filename: str):
-    auth = httpx.BasicAuth(username=get_env(
-        'API_USERNAME'), password=get_env('API_PASSWORD'))
-    start = time.time()
-
-    file_path = Path(filename)
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-
-    async with httpx.AsyncClient(timeout=DOWNLOAD_TIMEOUT) as client:
-        async with client.stream('GET', url, auth=auth, follow_redirects=True) as response:
-            response.raise_for_status()
-
-            content_length = response.headers.get('Content-Length')
-            file_size = get_file_size(content_length)
-
-            print(f'Downloading file ({file_size:.2f} MB)...')
-
-            async with aiofiles.open(filename, mode='wb') as file:
-                async for chunk in response.aiter_bytes(1024 * 1024):
-                    await file.write(chunk)
-
-
-async def download_file2(url: str, filename: str):
+async def download_file(url: str, filename: str) -> None:
     auth = BasicAuth(get_env('API_USERNAME'), get_env('API_PASSWORD'))
     start = time.time()
 
@@ -64,10 +40,8 @@ async def download_file2(url: str, filename: str):
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        timeout = aiohttp.ClientTimeout(total=DOWNLOAD_TIMEOUT)
-
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(url, auth=auth) as response:
+        async with AsyncClient(timeout=DOWNLOAD_TIMEOUT) as client:
+            async with client.stream('GET', url, auth=auth, follow_redirects=True) as response:
                 response.raise_for_status()
 
                 content_length = response.headers.get('Content-Length')
@@ -76,7 +50,7 @@ async def download_file2(url: str, filename: str):
                 print(f'Downloading file ({file_size:.2f} MB)...')
 
                 async with aiofiles.open(filename, mode='wb') as file:
-                    async for chunk in response.content.iter_chunked(1024 * 1024):
+                    async for chunk in response.aiter_bytes(1024 * 1024):
                         await file.write(chunk)
 
         print(
@@ -131,21 +105,20 @@ async def fetch_order(config: DatasetConfig) -> Dict[str, Any]:
     url = f'{DOWNLOAD_API_BASE_URL}/order'
 
     request_body = config.create_order_request_body()
-    data = json.dumps(request_body)
 
     headers = {
         'Content-Type': 'application/json'
     }
 
     auth = BasicAuth(get_env('API_USERNAME'), get_env('API_PASSWORD'))
-
+ 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, auth=auth, data=data) as response:
-                response.raise_for_status()
-                print('Download order placed')
+        async with AsyncClient() as client:
+            response = await client.post(url, headers=headers, auth=auth, json=request_body)
+            response.raise_for_status()
+            print('Download order placed')
 
-                return await response.json()
+            return response.json()
     except Exception as err:
         raise Exception(f'Error placing download order: {err}')
 
@@ -229,11 +202,11 @@ async def _get_feed_url(metadata_id: UUID, format_name: str) -> str | None:
 
 async def _fetch_feed(url: str) -> str:
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                response.raise_for_status()
+        async with AsyncClient(follow_redirects=True) as client:
+            response = await client.get(url)
+            response.raise_for_status()
 
-                return await response.text()
+            return response.text
     except Exception as err:
         raise Exception(f'Error fetching feed: {err}')
 
@@ -242,11 +215,11 @@ async def _fetch_dataset_metadata(metadata_id: UUID) -> Dict[str, Any]:
     url = f'{METADATA_API_URL}/{metadata_id}'
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                response.raise_for_status()
+        async with AsyncClient() as client:
+            response = await client.get(url)
+            response.raise_for_status()
 
-                return await response.json()
+            return response.json()
     except Exception as err:
         raise Exception(f'Error fetching dataset metadata: {err}')
 
