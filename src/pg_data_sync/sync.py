@@ -5,13 +5,13 @@ from uuid import uuid4
 from pathlib import Path
 from typing import List
 from . import dataset, db, utils
-from .models import DatasetConfig, IndexingConfig, FileMap, Format
+from .models import DatasetConfig, IndexingConfig, FileMap, Format, ExitCode
 
 tmp_dbs_created: List[str] = []
 roles_created: List[str] = []
 
 
-async def start() -> int:
+async def start() -> ExitCode:
     download_path: str = ''
 
     try:
@@ -22,7 +22,7 @@ async def start() -> int:
 
         if not file_maps:
             print('No need to restore database(s). Aborting...')
-            return -2
+            return ExitCode.CANCELLED
 
         download_path = await _download_dataset(config.dataset)
 
@@ -32,12 +32,22 @@ async def start() -> int:
         utils.delete_file_or_dir(download_path)
 
         print(f'Job finished in {round(time.time() - start, 2)} sec.')
-        return 0
+        return ExitCode.SUCCESS
     except Exception:
         err = traceback.format_exc()
         print(err)
         await _clean_up(download_path)
-        return -1
+        return ExitCode.FAILURE
+
+
+async def create_indexes() -> ExitCode:
+    try:
+        await db.create_indexes()
+        return ExitCode.SUCCESS
+    except Exception:
+        err = traceback.format_exc()
+        print(err)
+        return ExitCode.FAILURE
 
 
 async def _download_dataset(config: DatasetConfig) -> str:
@@ -76,8 +86,6 @@ async def _restore_database(download_path: str, file_map: FileMap, format: Forma
         db.restore_database(resource_path, tmp_db_name)
         await db.rename_schemas(tmp_db_name, file_map.db_schema or file_map.db_name)
 
-    await db.create_indexes(file_map.db_name, tmp_db_name, indexing_configs)
-
     await db.set_creation_date_comment(tmp_db_name)
 
     await db.close_active_connections(file_map.db_name)
@@ -110,4 +118,5 @@ async def _clean_up(download_path: str) -> None:
     for role_name in roles_created:
         await db.delete_role(role_name)
 
-__all__ = ['start']
+
+__all__ = ['start', 'index']

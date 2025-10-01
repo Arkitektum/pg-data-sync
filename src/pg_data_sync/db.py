@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 from psycopg.sql import SQL, Composed, Identifier, Literal, Placeholder
-from .models import IndexingConfig
+from .utils import load_config
 
 
 async def get_connection(db_name: str) -> AsyncConnection:
@@ -341,8 +341,10 @@ async def db_exists(db_name: str) -> bool:
         raise Exception(f'Error checking database existence: {err}')
 
 
-async def create_indexes(db_name: str, tmp_db_name: str, configs: List[IndexingConfig] | None) -> None:
-    if not configs:
+async def create_indexes() -> None:
+    config = load_config()
+
+    if not config.indexing:
         return
 
     print('Creating indexes...')
@@ -350,37 +352,35 @@ async def create_indexes(db_name: str, tmp_db_name: str, configs: List[IndexingC
     created = 0
     start = time.time()
 
-    for config in configs:
-        if not db_name in config.dbs:
-            continue
+    for config in config.indexing:
+        for db_name in config.dbs:
+            indexes = await _get_indexes(db_name, config.schemas)
 
-        indexes = await _get_indexes(tmp_db_name, config.schemas)
+            for schema_name in config.schemas:
+                geom_columns = await _get_all_geom_columns(db_name, schema_name, config.tables) if config.geom_index else {}
 
-        for schema_name in config.schemas:
-            geom_columns = await _get_all_geom_columns(tmp_db_name, schema_name, config.tables) if config.geom_index else {}
+                for table_name in config.tables:
+                    if not await table_exists(db_name, schema_name, table_name) and not await materialized_view_exists(db_name, schema_name, table_name):
+                        continue
 
-            for table_name in config.tables:
-                if not await table_exists(tmp_db_name, schema_name, table_name):
-                    continue
-
-                if config.id_column and not _has_primary_key(indexes, schema_name, table_name):
-                    await create_primary_key(tmp_db_name, schema_name, table_name, config.id_column)
-                    created += 1
-
-                if geom_columns:
-                    geom_column_names = geom_columns.get(table_name, [])
-
-                    for column_name in geom_column_names:
-                        if not _has_geom_index(indexes, schema_name, table_name, column_name):
-                            await create_geom_index(tmp_db_name, schema_name, table_name, column_name)
-                            created += 1
-
-                col_indexes = config.indexes or []
-
-                for column_names in col_indexes:
-                    if not _has_index(indexes, schema_name, table_name, column_names):
-                        await create_index(tmp_db_name, schema_name, table_name, column_names)
+                    if config.id_column and not _has_primary_key(indexes, schema_name, table_name):
+                        await create_primary_key(db_name, schema_name, table_name, config.id_column)
                         created += 1
+
+                    if geom_columns:
+                        geom_column_names = geom_columns.get(table_name, [])
+
+                        for column_name in geom_column_names:
+                            if not _has_geom_index(indexes, schema_name, table_name, column_name):
+                                await create_geom_index(db_name, schema_name, table_name, column_name)
+                                created += 1
+
+                    col_indexes = config.indexes or []
+
+                    for column_names in col_indexes:
+                        if not _has_index(indexes, schema_name, table_name, column_names):
+                            await create_index(db_name, schema_name, table_name, column_names)
+                            created += 1
 
     print(f'{created} indexes created in {round(time.time() - start, 2)} sec.')
 
@@ -417,6 +417,23 @@ async def view_exists(db_name: str, schema_name: str, view_name: str) -> bool:
                 return await cur.fetchone() != None
     except Exception as err:
         raise Exception(f'Error checking view existence: {err}')
+
+
+async def materialized_view_exists(db_name: str, schema_name: str, view_name: str) -> bool:
+    sql = SQL("""
+        SELECT 1
+        FROM pg_matviews
+        WHERE schemaname = {0} 
+            AND matviewname = {1}
+    """).format(Literal(schema_name), Literal(view_name))
+
+    try:
+        async with await get_connection(db_name) as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(sql)
+                return await cur.fetchone() != None
+    except Exception as err:
+        raise Exception(f'Error checking materialized view existence: {err}')
 
 
 async def role_exists(role_name: str) -> bool:
