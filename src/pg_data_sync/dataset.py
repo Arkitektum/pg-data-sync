@@ -13,6 +13,7 @@ import xmltodict
 from aiohttp import BasicAuth
 from .models import DatasetConfig
 from .utils import get_env, delete_file_or_dir, get_file_size
+import httpx
 
 DOWNLOAD_API_BASE_URL = 'https://nedlasting.geonorge.no/api'
 METADATA_API_URL = 'https://kartkatalog.geonorge.no/api/getdata'
@@ -33,15 +34,29 @@ async def place_order(config: DatasetConfig) -> str:
     return f'{DOWNLOAD_API_BASE_URL}/v3/download/order/{ref_number}/{file_id}'
 
 
-async def get_remote_file_size(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.head(url) as response:
-            if response.status == 200:
-                content_length = response.headers.get('Content-Length')
-                print(content_length)
-
-
 async def download_file(url: str, filename: str):
+    auth = httpx.BasicAuth(username=get_env(
+        'API_USERNAME'), password=get_env('API_PASSWORD'))
+    start = time.time()
+
+    file_path = Path(filename)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    async with httpx.AsyncClient(timeout=DOWNLOAD_TIMEOUT) as client:
+        async with client.stream('GET', url, auth=auth, follow_redirects=True) as response:
+            response.raise_for_status()
+
+            content_length = response.headers.get('Content-Length')
+            file_size = get_file_size(content_length)
+
+            print(f'Downloading file ({file_size:.2f} MB)...')
+
+            async with aiofiles.open(filename, mode='wb') as file:
+                async for chunk in response.aiter_bytes(1024 * 1024):
+                    await file.write(chunk)
+
+
+async def download_file2(url: str, filename: str):
     auth = BasicAuth(get_env('API_USERNAME'), get_env('API_PASSWORD'))
     start = time.time()
 
