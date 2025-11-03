@@ -579,6 +579,30 @@ async def get_columns(db_name: str, schema_name: str, table_name: str) -> List[s
         raise Exception(f'Error getting column names: {err}')
 
 
+async def get_mv_columns(db_name: str, schema_name: str, mv_name: str) -> List[str]:
+    sql = SQL("""
+        SELECT a.attname AS column_name
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_attribute a ON a.attrelid = c.oid
+        WHERE c.relkind = 'm'
+            AND n.nspname = {0}
+            AND c.relname = {1}
+            AND a.attnum > 0
+            AND NOT a.attisdropped
+        ORDER BY a.attnum
+    """).format(Literal(schema_name), Literal(mv_name))
+
+    try:
+        async with await get_connection(db_name) as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(sql)
+                return [record[0] async for record in cur]
+
+    except Exception as err:
+        raise Exception(f'Error getting column names: {err}')
+
+
 async def get_geom_columns(db_name, schema_name, table_name) -> List[str]:
     sql = SQL("""
         SELECT f_geometry_column
